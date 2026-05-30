@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'register_screen.dart';
+import 'admin_dashboard.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -50,9 +51,20 @@ class _LoginScreenState extends State<LoginScreen> {
         String token = responseData['token'];
         String role = responseData['user']['role'];
 
-        // 🔥 نجح الدخول: هنا تخزن الـ Token في الـ Shared Preferences
         print('Logged in successfully! Token: $token');
-
+        print('User role: $role');
+        if (role == 'admin') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AdminDashboard(adminToken: token),
+            ),
+          );
+        } else if (role == 'organization') {
+          // الانتقال لشاشة المنظمة
+        } else if (role == 'user') {
+          // الانتقال لشاشة المتبرع
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(responseData['message']),
