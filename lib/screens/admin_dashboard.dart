@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'login_screen.dart';
 import 'package:http/http.dart' as http;
 
 class AdminDashboard extends StatefulWidget {
@@ -171,6 +172,29 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
+  Future<void> logOut() async {
+    final url = Uri.parse('http://127.0.0.1:8000/api/admin/logout');
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer ${widget.adminToken}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      _showSnackBar('تعذر الاتصال بالسيرفر', Colors.red);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -240,7 +264,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              onTap: () => Navigator.pop(context),
+              onTap: () => logOut(),
             ),
             const SizedBox(height: 20),
           ],
@@ -280,7 +304,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  // ويدجت لبناء خيارات الـ Drawer بستايل متفاعل يوضح الخيار النشط
   Widget _buildDrawerItem(String section, String title, IconData icon) {
     bool isSelected = _currentSection == section;
     return ListTile(

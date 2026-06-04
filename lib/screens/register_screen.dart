@@ -1,6 +1,9 @@
 import 'dart:convert';
+import 'dart:io'; // ضروري للتعامل مع الملفات في الموبايل
+import 'package:flutter/foundation.dart'; // 👈 ضروري عشان كلمة kIsWeb
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({Key? key}) : super(key: key);
@@ -19,17 +22,47 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  String _selectedRole = 'user'; // القيمة الافتراضية (مستخدم عادي)
+  String _selectedRole = 'user'; // القيمة الافتراضية
 
-  // حقول المنظمة الإضافية (تظهر فقط لو اخترنا organization)
+  // حقول المنظمة الإضافية
   final _orgNameController = TextEditingController();
   final _orgDescController = TextEditingController();
-  String _selectedOrgType = 'charity'; // activist أو charity
+  String _selectedOrgType = 'charity';
 
   bool _isLoading = false;
 
+  // 👈 متغيرات اختيار الصورة المتوافقة مع الويب والموبايل
+  XFile? _pickedXFile;
+  final ImagePicker _picker = ImagePicker();
+
+  // 👈 دالة اختيار الصورة
+  Future<void> _pickImage() async {
+    final XFile? pickedFile = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80, // لتقليل حجم الصورة وضمان سرعة الرفع
+    );
+
+    if (pickedFile != null) {
+      setState(() {
+        _pickedXFile = pickedFile;
+      });
+    }
+  }
+
+  // 🔄 دالة الرفع والتسجيل المعدلة
   Future<void> registerUser() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // شرط إضافي: لو الحساب منظمة، لازم يختار صورة إثبات الهوية
+    if (_selectedRole == 'organization' && _pickedXFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('الرجاء اختيار صورة إثبات الهوية للمنظمة'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -37,44 +70,53 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final url = Uri.parse('http://127.0.0.1:8000/api/register');
 
-    // تجهيز البيانات بناءً على شروط الـ Validate في الـ Laravel عندك
-    Map<String, dynamic> requestBody = {
-      'firstName': _firstNameController.text.trim(),
-      'lastName': _lastNameController.text.trim(),
-      'email': _emailController.text.trim(),
-      'password': _passwordController.text,
-      'password_confirmation': _confirmPasswordController.text,
-      'role': _selectedRole,
-    };
-
-    // لو الـ Role منظمة، ضيف الحقول الإضافية اللي يطلبها لارافيل
-    if (_selectedRole == 'organization') {
-      requestBody['name'] = _orgNameController.text.trim();
-      requestBody['description'] = _orgDescController.text.trim();
-      requestBody['type'] = _selectedOrgType;
-    }
-
     try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode(requestBody),
-      );
+      //  1. استخدام MultipartRequest لدعم رفع الملفات والبايتس
+      var request = http.MultipartRequest('POST', url);
 
+      //  2. إضافة الـ Headers
+      request.headers.addAll({'Accept': 'application/json'});
+
+      //  3. إضافة الحقول النصية (Fields) داخل الـ Request
+      request.fields['firstName'] = _firstNameController.text.trim();
+      request.fields['lastName'] = _lastNameController.text.trim();
+      request.fields['email'] = _emailController.text.trim();
+      request.fields['password'] = _passwordController.text;
+      request.fields['password_confirmation'] = _confirmPasswordController.text;
+      request.fields['role'] = _selectedRole;
+
+      if (_selectedRole == 'organization') {
+        request.fields['name'] = _orgNameController.text.trim();
+        request.fields['description'] = _orgDescController.text.trim();
+        request.fields['type'] = _selectedOrgType;
+
+        //  4. الرفع الذكي عن طريق الـ Bytes لحل مشكلة الويب والموبايل
+        if (_pickedXFile != null) {
+          var syncBytes = await _pickedXFile!.readAsBytes();
+
+          request.files.add(
+            http.MultipartFile.fromBytes(
+              'document_path', // اسم الحقل المطابق للـ Validation في لارافيل
+              syncBytes,
+              filename: _pickedXFile!.name,
+            ),
+          );
+        }
+      }
+
+      //  5. إرسال الطلب واستقبال الرد وتحويل الـ Stream إلى Response عادي
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
       final responseData = jsonDecode(response.body);
 
       if (response.statusCode == 201) {
-        // 201 تعني Created بنجاح في كودك
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(responseData['message']),
+            content: Text(responseData['message'] ?? 'تم إنشاء الحساب بنجاح'),
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context); // رجوعه لشاشة الـ Login بعد التسجيل
+        Navigator.pop(context);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -121,7 +163,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // حقل الاسم الأول
               const Text(
                 'الاسم الأول',
                 style: TextStyle(fontWeight: FontWeight.bold),
@@ -140,8 +181,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 validator: (val) => val!.isEmpty ? 'الحقل مطلوب' : null,
               ),
               const SizedBox(height: 16),
-
-              // حقل اسم العائلة
               const Text(
                 'اللقب / اسم العائلة',
                 style: TextStyle(fontWeight: FontWeight.bold),
@@ -160,8 +199,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 validator: (val) => val!.isEmpty ? 'الحقل مطلوب' : null,
               ),
               const SizedBox(height: 16),
-
-              // البريد الإلكتروني
               const Text(
                 'البريد الإلكتروني',
                 style: TextStyle(fontWeight: FontWeight.bold),
@@ -183,8 +220,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     val!.contains('@') ? null : 'بريد إلكتروني غير صحيح',
               ),
               const SizedBox(height: 16),
-
-              // نوع الحساب (Role)
               const Text(
                 'نوع الحساب',
                 style: TextStyle(fontWeight: FontWeight.bold),
@@ -210,15 +245,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     child: Text('منظمة خيرية / جمعية'),
                   ),
                 ],
-                onChanged: (val) {
-                  setState(() {
-                    _selectedRole = val!;
-                  });
-                },
+                onChanged: (val) => setState(() => _selectedRole = val!),
               ),
               const SizedBox(height: 16),
 
-              // 🔥 حقول إضافية تظهر فقط إذا اختار حساب "منظمة" عشان تطابق كود الـ Laravel
+              // حقول المنظمة (تظهر فقط عند اختيار حساب منظمة)
               if (_selectedRole == 'organization') ...[
                 const Divider(height: 30, thickness: 2),
                 const Text(
@@ -297,16 +328,63 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       child: Text('ناشط مدني'),
                     ),
                   ],
-                  onChanged: (val) {
-                    setState(() {
-                      _selectedOrgType = val!;
-                    });
-                  },
+                  onChanged: (val) => setState(() => _selectedOrgType = val!),
+                ),
+                const SizedBox(height: 20),
+
+                const Text(
+                  'إثبات الهوية (صورة الترخيص أو العقد)',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blueGrey,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: _pickImage,
+                  child: Container(
+                    height: 150,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.grey.shade400,
+                        width: 2,
+                        style: BorderStyle.solid,
+                      ),
+                    ),
+                    child: _pickedXFile != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: kIsWeb
+                                ? Image.network(
+                                    _pickedXFile!.path,
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                  ) // عرض الصورة في الويب
+                                : Image.file(
+                                    File(_pickedXFile!.path),
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                  ), // عرض الصورة في الموبايل
+                          )
+                        : const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.add_photo_alternate,
+                                size: 40,
+                                color: Color(0xFF1E5631),
+                              ),
+                              SizedBox(height: 8),
+                              Text('اضغط هنا لاختيار صورة إثبات الهوية'),
+                            ],
+                          ),
+                  ),
                 ),
                 const Divider(height: 30, thickness: 2),
               ],
 
-              // كلمة المرور
               const Text(
                 'كلمة المرور',
                 style: TextStyle(fontWeight: FontWeight.bold),
@@ -328,8 +406,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     : 'كلمة المرور يجب أن لا تقل عن 6 أحرف',
               ),
               const SizedBox(height: 16),
-
-              // تأكيد كلمة المرور
               const Text(
                 'تأكيد كلمة المرور',
                 style: TextStyle(fontWeight: FontWeight.bold),
@@ -352,7 +428,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 30),
 
-              // زر التسجيل
               ElevatedButton(
                 onPressed: _isLoading ? null : registerUser,
                 style: ElevatedButton.styleFrom(

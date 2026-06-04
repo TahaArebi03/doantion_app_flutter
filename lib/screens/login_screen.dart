@@ -26,7 +26,6 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
     });
 
-    // 💡 ملاحظة: استبدل الـ IP بـ IP الجهاز بتاعك لو تجرب من جهاز حقيقي، أو 10.0.2.2 لو ايموليتر أندرويد
     final String apiUrl = kIsWeb
         ? 'http://127.0.0.1:8000/api/login'
         : 'http://10.0.2.2:8000/api/login';
@@ -71,9 +70,6 @@ class _LoginScreenState extends State<LoginScreen> {
             backgroundColor: Colors.green,
           ),
         );
-
-        // الانتقال للشاشة الرئيسية (مثال)
-        // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomeScreen()));
       } else {
         // فشل الدخول (بيانات خطأ أو حساب المنظمة pending)
         showError(responseData['message'] ?? 'Invalid credentials');
@@ -96,15 +92,11 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(
-        0xFFF8F9FA,
-      ), // نفس الخلفية الرمادية الفاتحة في صورتك
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: const BackButton(
-          color: Color(0xFF1E5631),
-        ), // اللون الأخضر الداكن
+        leading: const BackButton(color: Color(0xFF1E5631)),
         title: const Text(
           'تسجيل الدخول',
           style: TextStyle(
@@ -122,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 40),
-              // لوقو أو أيقونة ترحيبية بروح التطبيق
+
               const Icon(
                 Icons.volunteer_activism,
                 size: 80,
@@ -140,7 +132,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 40),
 
-              // حقل البريد الإلكتروني (نفس ستايل حقول الكارد في صورتك)
               const Text(
                 'البريد الإلكتروني',
                 style: TextStyle(
@@ -202,17 +193,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 40),
 
-              // زر التأكيد (زي زر الـ Confirm الأخضر العريض اللي لوطى في صورتك)
               ElevatedButton(
                 onPressed: _isLoading ? null : loginUser,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(
-                    0xFF1E5631,
-                  ), // الأخضر الداكن بتاعك
+                  backgroundColor: const Color(0xFF1E5631),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
-                  ), // حواف دائرية بالكامل
+                  ),
                 ),
                 child: _isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
