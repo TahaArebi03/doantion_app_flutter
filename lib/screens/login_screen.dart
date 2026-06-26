@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'register_screen.dart';
 import 'admin_dashboard.dart';
+import 'organization_dashboard.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -61,6 +62,12 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         } else if (role == 'organization') {
           // الانتقال لشاشة المنظمة
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OrganizationDashboard(orgToken: token),
+            ),
+          );
         } else if (role == 'user') {
           // الانتقال لشاشة المتبرع
         }
