@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'register_screen.dart';
 import 'admin_dashboard.dart';
 import 'organization_dashboard.dart';
+import 'member_dashboard.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -68,8 +69,13 @@ class _LoginScreenState extends State<LoginScreen> {
               builder: (context) => OrganizationDashboard(orgToken: token),
             ),
           );
-        } else if (role == 'user') {
-          // الانتقال لشاشة المتبرع
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MemberDashboard(userToken: token),
+            ),
+          );
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
