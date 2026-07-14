@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'register_screen.dart';
-import 'admin_dashboard.dart';
-import 'organization_dashboard.dart';
-import 'member_dashboard.dart';
+import '../admin/admin_dashboard.dart';
+import '../organization/organization_dashboard_screen.dart';
+import '../donor/donor_dashboard.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -66,14 +66,14 @@ class _LoginScreenState extends State<LoginScreen> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => OrganizationDashboard(orgToken: token),
+              builder: (context) => OrganizationDashboardScreen(orgToken: token),
             ),
           );
         } else {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => MemberDashboard(userToken: token),
+              builder: (context) => DonorDashboard(userToken: token),
             ),
           );
         }

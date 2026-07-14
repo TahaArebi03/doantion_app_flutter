@@ -1,6 +1,4 @@
 import 'dart:convert';
-import 'dart:io'; // ضروري للتعامل مع الملفات في الموبايل
-import 'package:flutter/foundation.dart'; // 👈 ضروري عشان كلمة kIsWeb
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -31,15 +29,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool _isLoading = false;
 
-  // 👈 متغيرات اختيار الصورة المتوافقة مع الويب والموبايل
+  // متغيرات اختيار الصورة المتوافقة مع الويب والموبايل
   XFile? _pickedXFile;
   final ImagePicker _picker = ImagePicker();
 
-  // 👈 دالة اختيار الصورة
   Future<void> _pickImage() async {
-    final XFile? pickedFile = await _picker.pickImage(
+    final pickedFile = await _picker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 80, // لتقليل حجم الصورة وضمان سرعة الرفع
+      imageQuality: 80,
     );
 
     if (pickedFile != null) {
@@ -49,11 +46,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  // 🔄 دالة الرفع والتسجيل المعدلة
   Future<void> registerUser() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // شرط إضافي: لو الحساب منظمة، لازم يختار صورة إثبات الهوية
     if (_selectedRole == 'organization' && _pickedXFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -71,13 +66,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final url = Uri.parse('http://127.0.0.1:8000/api/register');
 
     try {
-      //  1. استخدام MultipartRequest لدعم رفع الملفات والبايتس
-      var request = http.MultipartRequest('POST', url);
-
-      //  2. إضافة الـ Headers
+      final request = http.MultipartRequest('POST', url);
       request.headers.addAll({'Accept': 'application/json'});
-
-      //  3. إضافة الحقول النصية (Fields) داخل الـ Request
       request.fields['firstName'] = _firstNameController.text.trim();
       request.fields['lastName'] = _lastNameController.text.trim();
       request.fields['email'] = _emailController.text.trim();
@@ -90,13 +80,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         request.fields['description'] = _orgDescController.text.trim();
         request.fields['type'] = _selectedOrgType;
 
-        //  4. الرفع الذكي عن طريق الـ Bytes لحل مشكلة الويب والموبايل
         if (_pickedXFile != null) {
-          var syncBytes = await _pickedXFile!.readAsBytes();
-
+          final syncBytes = await _pickedXFile!.readAsBytes();
           request.files.add(
             http.MultipartFile.fromBytes(
-              'document_path', // اسم الحقل المطابق للـ Validation في لارافيل
+              'document_path',
               syncBytes,
               filename: _pickedXFile!.name,
             ),
@@ -104,9 +92,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         }
       }
 
-      //  5. إرسال الطلب واستقبال الرد وتحويل الـ Stream إلى Response عادي
-      var streamedResponse = await request.send();
-      var response = await http.Response.fromStream(streamedResponse);
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
       final responseData = jsonDecode(response.body);
 
       if (response.statusCode == 201) {
@@ -331,58 +318,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   onChanged: (val) => setState(() => _selectedOrgType = val!),
                 ),
                 const SizedBox(height: 20),
+                // اختيار صورة إثبات الهوية
+                ElevatedButton.icon(
+                  onPressed: _pickImage,
+                  icon: const Icon(Icons.image),
 
-                const Text(
-                  'إثبات الهوية (صورة الترخيص أو العقد)',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blueGrey,
+                  label: Text(
+                    _pickedXFile == null
+                        ? 'اختر صورة إثبات الهوية'
+                        : 'تم اختيار الصورة: ${_pickedXFile!.name}',
                   ),
-                ),
-                const SizedBox(height: 8),
-                InkWell(
-                  onTap: _pickImage,
-                  child: Container(
-                    height: 150,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E5631),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.grey.shade400,
-                        width: 2,
-                        style: BorderStyle.solid,
-                      ),
                     ),
-                    child: _pickedXFile != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: kIsWeb
-                                ? Image.network(
-                                    _pickedXFile!.path,
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
-                                  ) // عرض الصورة في الويب
-                                : Image.file(
-                                    File(_pickedXFile!.path),
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
-                                  ), // عرض الصورة في الموبايل
-                          )
-                        : const Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.add_photo_alternate,
-                                size: 40,
-                                color: Color(0xFF1E5631),
-                              ),
-                              SizedBox(height: 8),
-                              Text('اضغط هنا لاختيار صورة إثبات الهوية'),
-                            ],
-                          ),
                   ),
                 ),
-                const Divider(height: 30, thickness: 2),
               ],
 
               const Text(
