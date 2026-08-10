@@ -48,7 +48,7 @@ class _DonorDashboardState extends State<DonorDashboard> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.favorite_outline),
-            label: 'مفضلتي',
+            label: 'المفضلة',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.business_outlined),

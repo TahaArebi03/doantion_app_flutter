@@ -1,10 +1,11 @@
+import 'package:donation_app/models/member_model.dart';
 import 'package:flutter/material.dart';
 import '../../widgets/project_card.dart';
 import '../../widgets/organization_card.dart';
 import '../../widgets/member_card.dart';
 import '../../services/admin_service.dart';
 import '../../models/project_model.dart';
-
+import '../../services/member_service.dart';
 import '../../services/project_service.dart';
 import '../projects/project_detail_screen.dart';
 
@@ -29,6 +30,8 @@ class _AdminOrganizationDetailScreenState
   final AdminService _adminServices = AdminService();
   final ProjectService _projectService = ProjectService();
   bool _isLoading = true;
+  List<MemberModel> _members = [];
+  bool _isLoadingMembers = false;
   late String safeToken;
   Map<String, dynamic>? _orgData;
   List<ProjectModel> _orgProjects = [];
@@ -42,6 +45,7 @@ class _AdminOrganizationDetailScreenState
     safeToken = widget.adminToken ?? 'no_token';
     _fetchOrganizationDetails();
     _fetchOrganizationProjects();
+    _fetchOrganizationMembers();
   }
 
   // دالة مساعدة لإظهار الرسائل بستايل أنيق
@@ -109,6 +113,18 @@ class _AdminOrganizationDetailScreenState
     }
   }
 
+  Future<void> _fetchOrganizationMembers() async {
+    setState(() => _isLoadingMembers = true);
+    try {
+      final memberService = MemberService(safeToken);
+      _members = await memberService.getMembers(widget.orgId);
+    } catch (e) {
+      _showSnackBar('فشل جلب الأعضاء: $e', isError: true);
+    } finally {
+      setState(() => _isLoadingMembers = false);
+    }
+  }
+
   Widget build(BuildContext context) {
     const Color primaryIslamicColor = Color(0xFF1B4332);
     const Color goldAccent = Color(0xFFD4AF37);
@@ -155,10 +171,10 @@ class _AdminOrganizationDetailScreenState
   // 1. تبويب بيانات الجمعية مع تصحيح صياغة الأزرار
   Widget _buildInfoTab(BuildContext context) {
     if (_orgData == null) {
-    return const Center(child: CircularProgressIndicator());
-  }
+      return const Center(child: CircularProgressIndicator());
+    }
 
-  final Map<String, dynamic> org = _orgData!;
+    final Map<String, dynamic> org = _orgData!;
     // قراءة البيانات بناءً على الهيكل الراجع من السيرفر الخاص بك
     final orgId = _orgData?['id'] ?? 0;
     final name = _orgData?['name'] ?? 'لا يوجد اسم رسمي';
@@ -271,25 +287,31 @@ class _AdminOrganizationDetailScreenState
                     elevation: 0,
                   ),
                   // زر تعطيل مؤقت
-onPressed: () async {
-  try {
-    setState(() {
-      _isLoading = true; // لإظهار مؤشر تحميل إذا أردت
-    });
-    await _adminServices.pendingOrganization(adminToken: safeToken, id: orgId);
-    await _fetchOrganizationDetails(); // تحديث بيانات الجمعية
-    await _fetchOrganizationProjects(); // تحديث المشاريع
-    _showSnackBar('تم تعطيل الجمعية مؤقتاً بنجاح');
-  } catch (error) {
-    _showSnackBar('حدث خطأ أثناء تعطيل الجمعية', isError: true);
-  } finally {
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-},
+                  onPressed: () async {
+                    try {
+                      setState(() {
+                        _isLoading = true; // لإظهار مؤشر تحميل إذا أردت
+                      });
+                      await _adminServices.pendingOrganization(
+                        adminToken: safeToken,
+                        id: orgId,
+                      );
+                      await _fetchOrganizationDetails(); // تحديث بيانات الجمعية
+                      await _fetchOrganizationProjects(); // تحديث المشاريع
+                      _showSnackBar('تم تعطيل الجمعية مؤقتاً بنجاح');
+                    } catch (error) {
+                      _showSnackBar(
+                        'حدث خطأ أثناء تعطيل الجمعية',
+                        isError: true,
+                      );
+                    } finally {
+                      if (mounted) {
+                        setState(() {
+                          _isLoading = false;
+                        });
+                      }
+                    }
+                  },
                   child: const Text(
                     'تعطيل مؤقت',
                     style: TextStyle(fontWeight: FontWeight.bold),
@@ -309,19 +331,22 @@ onPressed: () async {
                     elevation: 0,
                   ),
                   // زر حذف نهائي
-onPressed: () async {
-  try {
-    setState(() => _isLoading = true);
-    await _adminServices.rejectOrganization(adminToken: safeToken, id: orgId);
-    await _fetchOrganizationDetails();
-    await _fetchOrganizationProjects();
-    _showSnackBar('تم رفض طلب الانضمام بنجاح');
-  } catch (error) {
-    _showSnackBar('حدث خطأ أثناء رفض الطلب', isError: true);
-  } finally {
-    if (mounted) setState(() => _isLoading = false);
-  }
-},
+                  onPressed: () async {
+                    try {
+                      setState(() => _isLoading = true);
+                      await _adminServices.rejectOrganization(
+                        adminToken: safeToken,
+                        id: orgId,
+                      );
+                      await _fetchOrganizationDetails();
+                      await _fetchOrganizationProjects();
+                      _showSnackBar('تم رفض طلب الانضمام بنجاح');
+                    } catch (error) {
+                      _showSnackBar('حدث خطأ أثناء رفض الطلب', isError: true);
+                    } finally {
+                      if (mounted) setState(() => _isLoading = false);
+                    }
+                  },
                   child: const Text(
                     'حذف نهائي',
                     style: TextStyle(fontWeight: FontWeight.bold),
@@ -341,19 +366,26 @@ onPressed: () async {
                     elevation: 0,
                   ),
                   // زر اعتماد وقبول
-onPressed: () async {
-  try {
-    setState(() => _isLoading = true);
-    await _adminServices.approveOrganization(adminToken: safeToken, id: orgId);
-    await _fetchOrganizationDetails();
-    await _fetchOrganizationProjects();
-    _showSnackBar('تم اعتماد الجمعية بنجاح');
-  } catch (error) {
-    _showSnackBar('حدث خطأ أثناء اعتماد الجمعية', isError: true);
-  } finally {
-    if (mounted) setState(() => _isLoading = false);
-  }
-},
+                  onPressed: () async {
+                    try {
+                      setState(() => _isLoading = true);
+                      await _adminServices.approveOrganization(
+                        adminToken: safeToken,
+                        id: orgId,
+                      );
+                      await _fetchOrganizationDetails();
+                      await _fetchOrganizationProjects();
+                      await _fetchOrganizationMembers();
+                      _showSnackBar('تم اعتماد الجمعية بنجاح');
+                    } catch (error) {
+                      _showSnackBar(
+                        'حدث خطأ أثناء اعتماد الجمعية',
+                        isError: true,
+                      );
+                    } finally {
+                      if (mounted) setState(() => _isLoading = false);
+                    }
+                  },
                   child: const Text(
                     'اعتماد وقبول',
                     style: TextStyle(fontWeight: FontWeight.bold),
@@ -613,7 +645,8 @@ onPressed: () async {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => ProjectDetailScreen(project: project),
+                                  builder: (context) =>
+                                      ProjectDetailScreen(project: project),
                                 ),
                               );
                             },
@@ -686,30 +719,83 @@ onPressed: () async {
 
   // 3. تبويب الأعضاء
   Widget _buildMembersTab() {
+    if (_isLoadingMembers) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF1B4332)),
+      );
+    }
+
+    if (_members.isEmpty) {
+      return const Center(
+        child: Text(
+          'لا يوجد أعضاء مسجلين في هذه الجمعية',
+          style: TextStyle(fontSize: 16, color: Colors.grey),
+        ),
+      );
+    }
+
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 12),
-      itemCount: 2,
-      itemBuilder: (context, index) => Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        elevation: 1,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: ListTile(
-          leading: const CircleAvatar(
-            backgroundColor: Color(0xFF1B4332),
-            child: Icon(Icons.person, color: Colors.white),
+      itemCount: _members.length,
+      itemBuilder: (context, index) {
+        final member = _members[index];
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          elevation: 1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
-          title: Text(
-            index == 0
-                ? 'الشيخ عبد الله أحمد (مدير الجمعية)'
-                : 'م. محمد علي (مشرف مشاريع)',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: _getRoleColor(member.role),
+              child: Text(
+                member.fullName.isNotEmpty ? member.fullName[0] : 'U',
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+            title: Text(
+              member.fullName,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(member.email),
+                const SizedBox(height: 2),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getRoleColor(member.role).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    MemberModel.translateRole(member.role),
+                    style: TextStyle(
+                      color: _getRoleColor(member.role),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-          subtitle: const Text(
-            'صلاحيات إدارة كاملة',
-            style: TextStyle(fontSize: 12),
-          ),
-        ),
-      ),
+        );
+      },
     );
+  }
+
+  Color _getRoleColor(String role) {
+    switch (role) {
+      case 'admin':
+        return Colors.blue;
+      case 'finance_manager':
+        return Colors.orange;
+      default:
+        return Colors.green;
+    }
   }
 }

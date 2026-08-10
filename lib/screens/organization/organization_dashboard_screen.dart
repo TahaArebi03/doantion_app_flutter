@@ -9,14 +9,16 @@ import '../../models/user_model.dart';
 import '../../widgets/project_card.dart';
 import '../../widgets/member_card.dart';
 import '../../widgets/custom_drawer.dart';
-import '../projects/create_project_screen.dart';   // مسار صحيح
-import '../projects/project_detail_screen.dart';   // مسار صحيح
-import '../auth/login_screen.dart';               
+import '../projects/create_project_screen.dart';
+import '../projects/project_detail_screen.dart';
+import '../auth/login_screen.dart';
+import '../../models/join_request_model.dart';
+
 class OrganizationDashboardScreen extends StatefulWidget {
   final String orgToken;
 
   const OrganizationDashboardScreen({Key? key, required this.orgToken})
-      : super(key: key);
+    : super(key: key);
 
   @override
   State<OrganizationDashboardScreen> createState() =>
@@ -32,15 +34,18 @@ class _OrganizationDashboardScreenState
 
   // Data
   Organization? _organization;
+  List<JoinRequest> _pendingRequests = [];
   List<ProjectModel> _projects = [];
   List<MemberModel> _members = [];
   List<UserModel> _availableUsers = [];
   List<UserModel> _filteredUsers = [];
 
   // UI State
+  bool _isLoadingRequests = false;
   bool _isLoading = true;
   bool _isLoadingProjects = false;
   bool _isLoadingMembers = false;
+  bool _isOwner = true;
   String _currentSection = 'projects';
 
   // Search controller
@@ -53,6 +58,7 @@ class _OrganizationDashboardScreenState
     _projectService = ProjectService(token: widget.orgToken);
     _memberService = MemberService(widget.orgToken);
     _fetchDashboardData();
+    _fetchPendingRequests();
   }
 
   @override
@@ -67,10 +73,7 @@ class _OrganizationDashboardScreenState
     try {
       await _fetchOrganizationInfo();
       if (_organization != null) {
-        await Future.wait([
-          _fetchProjects(),
-          _fetchMembers(),
-        ]);
+        await Future.wait([_fetchProjects(), _fetchMembers()]);
       }
     } catch (e) {
       _showSnackBar('فشل تحميل البيانات: $e', Colors.red);
@@ -91,7 +94,9 @@ class _OrganizationDashboardScreenState
     if (_organization == null) return;
     setState(() => _isLoadingProjects = true);
     try {
-      _projects = await _projectService.getProjectsForOrganization(_organization!.id);
+      _projects = await _projectService.getProjectsForOrganization(
+        _organization!.id,
+      );
     } catch (e) {
       _showSnackBar('فشل جلب المشاريع', Colors.red);
     } finally {
@@ -109,6 +114,18 @@ class _OrganizationDashboardScreenState
       _showSnackBar('فشل جلب الأعضاء', Colors.red);
     } finally {
       if (mounted) setState(() => _isLoadingMembers = false);
+    }
+  }
+
+  Future<void> _fetchPendingRequests() async {
+    setState(() => _isLoadingRequests = true);
+    try {
+      _pendingRequests = await _memberService
+          .getPendingRequestsForOrganization();
+    } catch (e) {
+      _showSnackBar('فشل جلب الطلبات', Colors.red);
+    } finally {
+      setState(() => _isLoadingRequests = false);
     }
   }
 
@@ -163,11 +180,11 @@ class _OrganizationDashboardScreenState
   Future<void> _createProject(Map<String, dynamic> data) async {
     try {
       await _projectService.createProject(
-  adminToken: widget.orgToken,
-  title: data['title'] ?? '',
-  description: data['description'] ?? '',
-  goalAmount: data['goal_amount'] ?? 0.0,
-);
+        adminToken: widget.orgToken,
+        title: data['title'] ?? '',
+        description: data['description'] ?? '',
+        goalAmount: data['goal_amount'] ?? 0.0,
+      );
       _showSnackBar('تم إنشاء المشروع بنجاح', Colors.green);
       await _fetchProjects();
     } catch (e) {
@@ -226,12 +243,15 @@ class _OrganizationDashboardScreenState
           if (section == 'members') _fetchMembers();
         },
         onLogout: _logout,
+        token: widget.orgToken,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF1B4332)))
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF1B4332)),
+            )
           : _currentSection == 'projects'
-              ? _buildProjectsTab()
-              : _buildMembersTab(),
+          ? _buildProjectsTab()
+          : _buildMembersTab(),
     );
   }
 
@@ -246,7 +266,8 @@ class _OrganizationDashboardScreenState
               final newProject = await Navigator.push<Map<String, dynamic>>(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => CreateProjectScreen(orgToken: widget.orgToken),
+                  builder: (context) =>
+                      CreateProjectScreen(orgToken: widget.orgToken),
                 ),
               );
               if (newProject != null) await _createProject(newProject);
@@ -255,7 +276,9 @@ class _OrganizationDashboardScreenState
               backgroundColor: const Color(0xFF1B4332),
               foregroundColor: Colors.white,
               minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             icon: const Icon(Icons.add_circle_outline),
             label: const Text(
@@ -266,32 +289,38 @@ class _OrganizationDashboardScreenState
         ),
         Expanded(
           child: _isLoadingProjects
-              ? const Center(child: CircularProgressIndicator(color: Color(0xFF1B4332)))
+              ? const Center(
+                  child: CircularProgressIndicator(color: Color(0xFF1B4332)),
+                )
               : _projects.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'لا توجد مشاريع مسجلة',
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      itemCount: _projects.length,
-                      itemBuilder: (context, index) {
-                        final project = _projects[index];
-                        return ProjectCard(
-                          project: project,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ProjectDetailScreen(project: project),
-                              ),
-                            );
-                          },
+              ? const Center(
+                  child: Text(
+                    'لا توجد مشاريع مسجلة',
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  itemCount: _projects.length,
+                  itemBuilder: (context, index) {
+                    final project = _projects[index];
+                    return ProjectCard(
+                      project: project,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                ProjectDetailScreen(project: project),
+                          ),
                         );
                       },
-                    ),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -300,13 +329,14 @@ class _OrganizationDashboardScreenState
   // ==================== Members Tab ====================
   Widget _buildMembersTab() {
     return DefaultTabController(
-      length: 2,
+      length: 3, // الأعضاء، إضافة عضو، الطلبات
       child: Column(
         children: [
           const TabBar(
             tabs: [
               Tab(text: 'الأعضاء الحاليين', icon: Icon(Icons.people)),
               Tab(text: 'إضافة عضو', icon: Icon(Icons.person_add)),
+              Tab(text: 'الطلبات', icon: Icon(Icons.notifications_active)),
             ],
             labelColor: Color(0xFF1B4332),
             unselectedLabelColor: Colors.grey,
@@ -318,6 +348,7 @@ class _OrganizationDashboardScreenState
               children: [
                 _buildCurrentMembersTab(),
                 _buildAddMemberTab(),
+                _buildRequestsTab(),
               ],
             ),
           ),
@@ -335,7 +366,10 @@ class _OrganizationDashboardScreenState
             children: [
               Text(
                 'الأعضاء الحاليين (${_members.length})',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
               const Spacer(),
               IconButton(
@@ -347,47 +381,53 @@ class _OrganizationDashboardScreenState
         ),
         Expanded(
           child: _isLoadingMembers
-              ? const Center(child: CircularProgressIndicator(color: Color(0xFF1B4332)))
+              ? const Center(
+                  child: CircularProgressIndicator(color: Color(0xFF1B4332)),
+                )
               : _members.isEmpty
-                  ? const Center(child: Text('لا يوجد أعضاء مسجلين'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _members.length,
-                      itemBuilder: (context, index) {
-                        final member = _members[index];
-                        return MemberCard(
-                          member: member,
-                          onRoleChanged: (newRole) {
-                            _updateMemberRole(member, newRole);
-                          },
-                          onRemove: () {
-                            showDialog(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                title: const Text('تأكيد الحذف'),
-                                content: const Text('هل أنت متأكد من حذف هذا العضو؟'),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(ctx),
-                                    child: const Text('إلغاء'),
-                                  ),
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      Navigator.pop(ctx);
-                                      _removeMember(member);
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.redAccent,
-                                    ),
-                                    child: const Text('حذف'),
-                                  ),
-                                ],
+              ? const Center(child: Text('لا يوجد أعضاء مسجلين'))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _members.length,
+                  itemBuilder: (context, index) {
+                    final member = _members[index];
+                    return MemberCard(
+                      member: member,
+                      // organization owner can edit roles and remove members
+                      canEdit: _isOwner,
+                      onRoleChanged: (newRole) {
+                        _updateMemberRole(member, newRole);
+                      },
+                      onRemove: () {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('تأكيد الحذف'),
+                            content: const Text(
+                              'هل أنت متأكد من حذف هذا العضو؟',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: const Text('إلغاء'),
                               ),
-                            );
-                          },
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pop(ctx);
+                                  _removeMember(member);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.redAccent,
+                                ),
+                                child: const Text('حذف'),
+                              ),
+                            ],
+                          ),
                         );
                       },
-                    ),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -406,7 +446,10 @@ class _OrganizationDashboardScreenState
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 0,
+                horizontal: 16,
+              ),
               filled: true,
               fillColor: Colors.white,
             ),
@@ -447,7 +490,11 @@ class _OrganizationDashboardScreenState
                             style: const TextStyle(color: Colors.white),
                           ),
                         ),
-                        title: Text(user.fullName.isNotEmpty ? user.fullName : 'مستخدم بدون اسم'),
+                        title: Text(
+                          user.fullName.isNotEmpty
+                              ? user.fullName
+                              : 'مستخدم بدون اسم',
+                        ),
                         subtitle: Text(user.email),
                         trailing: ElevatedButton(
                           onPressed: () {
@@ -471,8 +518,71 @@ class _OrganizationDashboardScreenState
     );
   }
 
+  Widget _buildRequestsTab() {
+    if (_isLoadingRequests) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_pendingRequests.isEmpty) {
+      return const Center(child: Text('لا توجد طلبات معلقة'));
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _pendingRequests.length,
+      itemBuilder: (context, index) {
+        final request = _pendingRequests[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundImage: request.userImage != null
+                  ? NetworkImage(request.userImage!)
+                  : null,
+              child: request.userImage == null
+                  ? Text(
+                      request.fullName.isNotEmpty ? request.fullName[0] : 'U',
+                    )
+                  : null,
+            ),
+            title: Text(request.fullName),
+            subtitle: Text(request.email),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.check_circle, color: Colors.green),
+                  onPressed: () async {
+                    try {
+                      await _memberService.approveRequest(request.id);
+                      _showSnackBar('تم قبول الطلب', Colors.green);
+                      await _fetchPendingRequests(); // تحديث القائمة
+                      await _fetchMembers(); // تحديث قائمة الأعضاء
+                    } catch (e) {
+                      _showSnackBar('فشل القبول', Colors.red);
+                    }
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.cancel, color: Colors.red),
+                  onPressed: () async {
+                    try {
+                      await _memberService.rejectRequest(request.id);
+                      _showSnackBar('تم رفض الطلب', Colors.orange);
+                      await _fetchPendingRequests();
+                    } catch (e) {
+                      _showSnackBar('فشل الرفض', Colors.red);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _showAddMemberDialog(UserModel user) {
-    String selectedRole = 'عضو';
+    String selectedRole = 'member';
     showDialog(
       context: context,
       builder: (context) {
@@ -492,9 +602,12 @@ class _OrganizationDashboardScreenState
                   DropdownButtonFormField<String>(
                     value: selectedRole,
                     items: const [
-                      DropdownMenuItem(value: 'عضو', child: Text('عضو')),
-                      DropdownMenuItem(value: 'مشرف', child: Text('مشرف')),
-                      DropdownMenuItem(value: 'مدير مالي', child: Text('مدير مالي')),
+                      DropdownMenuItem(value: 'member', child: Text('عضو')),
+                      DropdownMenuItem(value: 'admin', child: Text('مشرف')),
+                      DropdownMenuItem(
+                        value: 'finance_manager',
+                        child: Text('مدير مالي'),
+                      ),
                     ],
                     onChanged: (v) => setStateDialog(() => selectedRole = v!),
                     decoration: const InputDecoration(

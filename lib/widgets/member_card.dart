@@ -5,12 +5,14 @@ class MemberCard extends StatelessWidget {
   final MemberModel member;
   final ValueChanged<String> onRoleChanged;
   final VoidCallback onRemove;
+  final bool canEdit;
 
   const MemberCard({
     Key? key,
     required this.member,
     required this.onRoleChanged,
     required this.onRemove,
+    this.canEdit = false,
   }) : super(key: key);
 
   @override
@@ -22,38 +24,77 @@ class MemberCard extends StatelessWidget {
         child: Row(
           children: [
             CircleAvatar(
-              child: Text(member.fullName.isNotEmpty ? member.fullName[0] : 'U'),
+              child: Text(
+                member.fullName.isNotEmpty ? member.fullName[0] : 'U',
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(member.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  Text(member.email, style: const TextStyle(color: Colors.grey)),
+                  Text(
+                    member.fullName,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    member.email,
+                    style: const TextStyle(color: Colors.grey),
+                  ),
                 ],
               ),
             ),
-            DropdownButton<String>(
-              value: member.role,
-              items: const [
-                DropdownMenuItem(value: 'عضو', child: Text('عضو')),
-                DropdownMenuItem(value: 'مشرف', child: Text('مشرف')),
-                DropdownMenuItem(value: 'مدير مالي', child: Text('مدير مالي')),
-              ],
-              onChanged: (newRole) {
-                if (newRole != null && newRole != member.role) {
-                  onRoleChanged(newRole);
-                }
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: onRemove,
-            ),
+            if (canEdit)
+              DropdownButton<String>(
+                value: member.role,
+                items: const [
+                  DropdownMenuItem(value: 'member', child: Text('عضو')),
+                  DropdownMenuItem(value: 'admin', child: Text('مشرف')),
+                  DropdownMenuItem(
+                    value: 'finance_manager',
+                    child: Text('مدير مالي'),
+                  ),
+                ],
+                onChanged: (newRole) {
+                  if (newRole != null && newRole != member.role) {
+                    onRoleChanged(newRole);
+                  }
+                },
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: _getRoleColor(member.role).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  MemberModel.translateRole(member.role),
+                  style: TextStyle(color: _getRoleColor(member.role)),
+                ),
+              ),
+            if (canEdit)
+              IconButton(
+                icon: const Icon(Icons.delete, color: Colors.red),
+                onPressed: onRemove,
+              ),
           ],
         ),
       ),
     );
+  }
+
+  Color _getRoleColor(String role) {
+    switch (role) {
+      case 'admin':
+        return Colors.blue;
+      case 'finance_manager':
+        return Colors.orange;
+      default:
+        return Colors.green;
+    }
   }
 }

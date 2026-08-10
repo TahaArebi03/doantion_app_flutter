@@ -1,12 +1,22 @@
 import 'package:flutter/material.dart';
+import '../screens/profile/my_invitations_screen.dart';
+import '../screens/profile/my_requests_screen.dart';
 
 class CustomDrawer extends StatelessWidget {
   final String organizationName;
   final String currentSection;
   final ValueChanged<String> onSectionChanged;
   final VoidCallback onLogout;
+  final String token;
 
-  const CustomDrawer({Key? key, required this.organizationName, required this.currentSection, required this.onSectionChanged, required this.onLogout}) : super(key: key);
+  const CustomDrawer({
+    Key? key,
+    required this.organizationName,
+    required this.currentSection,
+    required this.onSectionChanged,
+    required this.onLogout,
+    required this.token,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -16,10 +26,32 @@ class CustomDrawer extends StatelessWidget {
           UserAccountsDrawerHeader(
             accountName: Text(organizationName),
             accountEmail: const Text('مدير الجمعية'),
-            currentAccountPicture: const CircleAvatar(child: Icon(Icons.business)),
+            currentAccountPicture: const CircleAvatar(
+              child: Icon(Icons.business),
+            ),
           ),
-          ListTile(title: const Text('المشاريع'), onTap: () => onSectionChanged('projects')),
-          ListTile(title: const Text('الأعضاء'), onTap: () => onSectionChanged('members')),
+          ListTile(
+            title: const Text('المشاريع'),
+            onTap: () => onSectionChanged('projects'),
+          ),
+          ListTile(
+            title: const Text('الأعضاء'),
+            onTap: () => onSectionChanged('members'),
+          ),
+
+          ListTile(
+            leading: const Icon(Icons.mail_outline, color: Color(0xFF1B4332)),
+            title: const Text('الدعوات'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MyInvitationsScreen(token: token),
+                ),
+              );
+            },
+          ),
           const Spacer(),
           ListTile(title: const Text('تسجيل الخروج'), onTap: onLogout),
         ],
