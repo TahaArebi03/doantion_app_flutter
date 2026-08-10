@@ -46,6 +46,7 @@ class _OrganizationDashboardScreenState
   bool _isLoadingProjects = false;
   bool _isLoadingMembers = false;
   bool _isOwner = true;
+  bool _isAdding = false;
   String _currentSection = 'projects';
 
   // Search controller
@@ -148,11 +149,15 @@ class _OrganizationDashboardScreenState
   // ==================== Member Actions ====================
   Future<void> _addMember(UserModel user, String role) async {
     try {
+      setState(() => _isAdding = true); // أضف متغير bool
       await _memberService.addMember(user.id, role);
       _showSnackBar('تمت إضافة العضو بنجاح', Colors.green);
       await _fetchMembers();
     } catch (e) {
-      _showSnackBar('فشل الإضافة', Colors.red);
+      // عرض رسالة الخطأ الفعلية
+      _showSnackBar('فشل الإضافة: ${e.toString()}', Colors.red);
+    } finally {
+      setState(() => _isAdding = false);
     }
   }
 

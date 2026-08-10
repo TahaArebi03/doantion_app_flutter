@@ -51,8 +51,17 @@ class MemberService {
       headers: _headers,
       body: jsonEncode({'user_id': userId, 'role': role}),
     );
-    if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception('فشل إضافة العضو');
+
+    // قراءة الرد من السيرفر
+    final responseData = jsonDecode(response.body);
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return; // نجاح
+    } else {
+      // عرض رسالة الخطأ من السيرفر
+      final errorMessage =
+          responseData['error'] ?? responseData['message'] ?? 'فشل إضافة العضو';
+      throw Exception(errorMessage);
     }
   }
 
