@@ -8,8 +8,10 @@ import '../models/invitation_model.dart';
 class MemberService {
   final String _baseUrl = 'http://127.0.0.1:8000';
   final String token;
+  final http.Client _client;
 
-  MemberService(this.token);
+  MemberService(this.token, {http.Client? client})
+    : _client = client ?? http.Client();
 
   Map<String, String> get _headers => {
     'Content-Type': 'application/json',
@@ -18,7 +20,7 @@ class MemberService {
   };
 
   Future<List<MemberModel>> getMembers(int orgId) async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse('$_baseUrl/api/member/list_members?organization_id=$orgId'),
       headers: _headers,
     );
@@ -32,7 +34,7 @@ class MemberService {
   }
 
   Future<List<UserModel>> getAllUsers() async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse('$_baseUrl/api/users'),
       headers: _headers,
     );
@@ -46,27 +48,39 @@ class MemberService {
   }
 
   Future<void> addMember(int userId, String role) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/api/member/add'),
+    await inviteMember(userId, role);
+  }
+
+  Future<void> inviteMember(
+    int userId,
+    String role, {
+    int? organizationId,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$_baseUrl/api/member/invite'),
       headers: _headers,
-      body: jsonEncode({'user_id': userId, 'role': role}),
+      body: jsonEncode({
+        'user_id': userId,
+        'role': role,
+        if (organizationId != null) 'organization_id': organizationId,
+      }),
     );
 
-    // قراءة الرد من السيرفر
     final responseData = jsonDecode(response.body);
 
     if (response.statusCode == 200 || response.statusCode == 201) {
-      return; // نجاح
+      return;
     } else {
-      // عرض رسالة الخطأ من السيرفر
       final errorMessage =
-          responseData['error'] ?? responseData['message'] ?? 'فشل إضافة العضو';
+          responseData['error'] ??
+          responseData['message'] ??
+          'فشل إرسال الدعوة';
       throw Exception(errorMessage);
     }
   }
 
   Future<void> updateRole(int userId, String newRole) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$_baseUrl/api/member/update-role'),
       headers: _headers,
       body: jsonEncode({'user_id': userId, 'role': newRole}),
@@ -77,7 +91,7 @@ class MemberService {
   }
 
   Future<void> removeMember(int userId) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$_baseUrl/api/member/remove'),
       headers: _headers,
       body: jsonEncode({'user_id': userId}),
@@ -87,10 +101,25 @@ class MemberService {
     }
   }
 
+  Future<void> removeInvitation(int invitationId) async {
+    final response = await _client.post(
+      Uri.parse('$_baseUrl/api/member/remove-invitation'),
+      headers: _headers,
+      body: jsonEncode({'invitation_id': invitationId}),
+    );
+
+    if (response.statusCode == 200) return;
+
+    final errorData = jsonDecode(response.body);
+    throw Exception(
+      errorData['error'] ?? errorData['message'] ?? 'فشل حذف الدعوة',
+    );
+  }
+
   // ------------------- طلبات الانضمام (المستخدم يطلب) -------------------
   Future<List<JoinRequest>> getPendingRequestsForOrganization() async {
     // خاصة بالمدير: جلب الطلبات المعلقة لجمعيته
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse('$_baseUrl/api/member/pending-requests'),
       headers: _headers,
     );
@@ -104,7 +133,7 @@ class MemberService {
   }
 
   Future<void> approveRequest(int requestId) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$_baseUrl/api/member/approve-request'),
       headers: _headers,
       body: jsonEncode({'request_id': requestId}),
@@ -115,7 +144,7 @@ class MemberService {
   }
 
   Future<void> rejectRequest(int requestId) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$_baseUrl/api/member/reject-request'),
       headers: _headers,
       body: jsonEncode({'request_id': requestId}),
@@ -126,8 +155,22 @@ class MemberService {
   }
 
   // خاصة بالمستخدم: جلب طلباتي (التي قدمتها)
+  Future<List<Invitation>> getSentInvitations({int? organizationId}) async {
+    final uri = Uri.parse(
+      '$_baseUrl/api/member/invitations${organizationId != null ? '?organization_id=$organizationId' : ''}',
+    );
+    final response = await _client.get(uri, headers: _headers);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final List<dynamic> invitations = data['invitations'] ?? [];
+      return invitations.map((i) => Invitation.fromJson(i)).toList();
+    } else {
+      throw Exception('فشل في جلب الدعوات المرسلة');
+    }
+  }
+
   Future<List<JoinRequest>> getMyRequests() async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse('$_baseUrl/api/member/my-requests'),
       headers: _headers,
     );
@@ -142,7 +185,7 @@ class MemberService {
 
   // تقديم طلب انضمام لجمعية
   Future<void> submitJoinRequest(int organizationId) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$_baseUrl/api/member/join-request'),
       headers: _headers,
       body: jsonEncode({'organization_id': organizationId}),
@@ -154,7 +197,7 @@ class MemberService {
 
   // التحقق من حالة طلب المستخدم لجمعية معينة
   Future<String?> getUserRequestStatus(int organizationId) async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse(
         '$_baseUrl/api/member/request-status?organization_id=$organizationId',
       ),
@@ -170,7 +213,7 @@ class MemberService {
 
   // ------------------- دعوات الجمعية (الجمعية تدعو المستخدم) -------------------
   Future<List<Invitation>> getMyInvitations() async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse('$_baseUrl/api/member/invitations'),
       headers: _headers,
     );
@@ -184,7 +227,7 @@ class MemberService {
   }
 
   Future<void> acceptInvitation(int invitationId) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$_baseUrl/api/member/accept-invitation'),
       headers: _headers,
       body: jsonEncode({'invitation_id': invitationId}),
@@ -193,7 +236,7 @@ class MemberService {
   }
 
   Future<void> rejectInvitation(int invitationId) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse('$_baseUrl/api/member/reject-invitation'),
       headers: _headers,
       body: jsonEncode({'invitation_id': invitationId}),

@@ -39,19 +39,6 @@ class CustomDrawer extends StatelessWidget {
             onTap: () => onSectionChanged('members'),
           ),
 
-          ListTile(
-            leading: const Icon(Icons.mail_outline, color: Color(0xFF1B4332)),
-            title: const Text('الدعوات'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => MyInvitationsScreen(token: token),
-                ),
-              );
-            },
-          ),
           const Spacer(),
           ListTile(title: const Text('تسجيل الخروج'), onTap: onLogout),
         ],

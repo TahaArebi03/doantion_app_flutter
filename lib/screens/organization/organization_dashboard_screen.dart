@@ -6,6 +6,7 @@ import '../../models/organization_model.dart';
 import '../../models/project_model.dart';
 import '../../models/member_model.dart';
 import '../../models/user_model.dart';
+import '../../models/invitation_model.dart';
 import '../../widgets/project_card.dart';
 import '../../widgets/member_card.dart';
 import '../../widgets/custom_drawer.dart';
@@ -39,14 +40,17 @@ class _OrganizationDashboardScreenState
   List<MemberModel> _members = [];
   List<UserModel> _availableUsers = [];
   List<UserModel> _filteredUsers = [];
+  List<Invitation> _sentInvitations = [];
 
   // UI State
   bool _isLoadingRequests = false;
   bool _isLoading = true;
   bool _isLoadingProjects = false;
   bool _isLoadingMembers = false;
+  bool _isLoadingInvitations = false;
   bool _isOwner = true;
   bool _isAdding = false;
+  bool _isRemoving = false;
   String _currentSection = 'projects';
 
   // Search controller
@@ -111,10 +115,25 @@ class _OrganizationDashboardScreenState
     try {
       _members = await _memberService.getMembers(_organization!.id);
       await _fetchAvailableUsers();
+      await _fetchSentInvitations();
     } catch (e) {
       _showSnackBar('فشل جلب الأعضاء', Colors.red);
     } finally {
       if (mounted) setState(() => _isLoadingMembers = false);
+    }
+  }
+
+  Future<void> _fetchSentInvitations() async {
+    if (_organization == null) return;
+    setState(() => _isLoadingInvitations = true);
+    try {
+      _sentInvitations = await _memberService.getSentInvitations(
+        organizationId: _organization!.id,
+      );
+    } catch (e) {
+      _showSnackBar('فشل جلب الدعوات المرسلة', Colors.red);
+    } finally {
+      if (mounted) setState(() => _isLoadingInvitations = false);
     }
   }
 
@@ -147,15 +166,20 @@ class _OrganizationDashboardScreenState
   }
 
   // ==================== Member Actions ====================
-  Future<void> _addMember(UserModel user, String role) async {
+  Future<void> _sendInvitation(UserModel user, String role) async {
     try {
-      setState(() => _isAdding = true); // أضف متغير bool
-      await _memberService.addMember(user.id, role);
-      _showSnackBar('تمت إضافة العضو بنجاح', Colors.green);
-      await _fetchMembers();
+      setState(() => _isAdding = true);
+      await _memberService.inviteMember(
+        user.id,
+        role,
+        organizationId: _organization?.id,
+      );
+      _showSnackBar('تم إرسال الدعوة بنجاح', Colors.green);
+      _availableUsers.removeWhere((u) => u.id == user.id);
+      _filteredUsers.removeWhere((u) => u.id == user.id);
+      await _fetchSentInvitations();
     } catch (e) {
-      // عرض رسالة الخطأ الفعلية
-      _showSnackBar('فشل الإضافة: ${e.toString()}', Colors.red);
+      _showSnackBar('فشل إرسال الدعوة: ${e.toString()}', Colors.red);
     } finally {
       setState(() => _isAdding = false);
     }
@@ -334,14 +358,15 @@ class _OrganizationDashboardScreenState
   // ==================== Members Tab ====================
   Widget _buildMembersTab() {
     return DefaultTabController(
-      length: 3, // الأعضاء، إضافة عضو، الطلبات
+      length: 4, // الأعضاء، إضافة عضو، الطلبات، الدعوات
       child: Column(
         children: [
           const TabBar(
             tabs: [
               Tab(text: 'الأعضاء الحاليين', icon: Icon(Icons.people)),
-              Tab(text: 'إضافة عضو', icon: Icon(Icons.person_add)),
+              Tab(text: 'إرسال دعوة', icon: Icon(Icons.person_add)),
               Tab(text: 'الطلبات', icon: Icon(Icons.notifications_active)),
+              Tab(text: 'الدعوات', icon: Icon(Icons.email)),
             ],
             labelColor: Color(0xFF1B4332),
             unselectedLabelColor: Colors.grey,
@@ -352,8 +377,9 @@ class _OrganizationDashboardScreenState
             child: TabBarView(
               children: [
                 _buildCurrentMembersTab(),
-                _buildAddMemberTab(),
+                _buildInviteMemberTab(),
                 _buildRequestsTab(),
+                _buildInvitationsTab(),
               ],
             ),
           ),
@@ -438,7 +464,7 @@ class _OrganizationDashboardScreenState
     );
   }
 
-  Widget _buildAddMemberTab() {
+  Widget _buildInviteMemberTab() {
     return Column(
       children: [
         Padding(
@@ -503,7 +529,7 @@ class _OrganizationDashboardScreenState
                         subtitle: Text(user.email),
                         trailing: ElevatedButton(
                           onPressed: () {
-                            _showAddMemberDialog(user);
+                            _showInviteMemberDialog(user);
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF1B4332),
@@ -512,7 +538,7 @@ class _OrganizationDashboardScreenState
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
-                          child: const Text('إضافة'),
+                          child: const Text('دعوة'),
                         ),
                       ),
                     );
@@ -586,7 +612,150 @@ class _OrganizationDashboardScreenState
     );
   }
 
-  void _showAddMemberDialog(UserModel user) {
+  Widget _buildInvitationsTab() {
+    if (_isLoadingInvitations) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF1B4332)),
+      );
+    }
+
+    if (_sentInvitations.isEmpty) {
+      return const Center(child: Text('لا توجد دعوات مرسلة'));
+    }
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              Text(
+                'الدعوات المرسلة (${_sentInvitations.length})',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: _fetchSentInvitations,
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: _sentInvitations.length,
+            itemBuilder: (context, index) {
+              final invitation = _sentInvitations[index];
+              final inviteeName = invitation.inviteeName.isNotEmpty
+                  ? invitation.inviteeName
+                  : 'مستخدم غير معروف';
+              final inviteeEmail = invitation.inviteeEmail.isNotEmpty
+                  ? invitation.inviteeEmail
+                  : 'بدون بريد إلكتروني';
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  title: Text(inviteeName),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(inviteeEmail),
+                      const SizedBox(height: 4),
+                      Text('تاريخ الدعوة: ${invitation.createdAt.toLocal()}'),
+                    ],
+                  ),
+
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Chip(
+                        label: Text(
+                          invitation.status == 'accepted'
+                              ? 'مقبولة'
+                              : invitation.status == 'rejected'
+                              ? 'مرفوضة'
+                              : 'معلقة',
+                        ),
+                        backgroundColor: invitation.status == 'accepted'
+                            ? Colors.green.withOpacity(0.16)
+                            : invitation.status == 'rejected'
+                            ? Colors.red.withOpacity(0.16)
+                            : Colors.orange.withOpacity(0.16),
+                      ),
+                      const SizedBox(width: 8),
+                      // زر إلغاء الدعوة (يظهر فقط للدعوات المعلقة)
+                      if (invitation.status == 'pending')
+                        IconButton(
+                          icon: const Icon(
+                            Icons.cancel_outlined,
+                            color: Colors.red,
+                          ),
+                          onPressed: _isRemoving
+                              ? null
+                              : () async {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('تأكيد إلغاء الدعوة'),
+                                      content: const Text(
+                                        'هل أنت متأكد من إلغاء هذه الدعوة؟',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(ctx, false),
+                                          child: const Text('إلغاء'),
+                                        ),
+                                        ElevatedButton(
+                                          onPressed: () =>
+                                              Navigator.pop(ctx, true),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.redAccent,
+                                          ),
+                                          child: const Text('إلغاء الدعوة'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true) {
+                                    setState(() => _isRemoving = true);
+                                    try {
+                                      await _memberService.removeInvitation(
+                                        invitation.id,
+                                      );
+                                      _showSnackBar(
+                                        'تم إلغاء الدعوة',
+                                        Colors.green,
+                                      );
+                                      await _fetchSentInvitations();
+                                    } catch (e) {
+                                      _showSnackBar(
+                                        'فشل الإلغاء: ${e.toString()}',
+                                        Colors.red,
+                                      );
+                                    } finally {
+                                      setState(() => _isRemoving = false);
+                                    }
+                                  }
+                                },
+                          tooltip: 'إلغاء الدعوة',
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showInviteMemberDialog(UserModel user) {
     String selectedRole = 'member';
     showDialog(
       context: context,
@@ -594,7 +763,7 @@ class _OrganizationDashboardScreenState
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             return AlertDialog(
-              title: const Text('إضافة عضو جديد'),
+              title: const Text('دعوة عضو جديد'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -630,12 +799,12 @@ class _OrganizationDashboardScreenState
                 ElevatedButton(
                   onPressed: () {
                     Navigator.pop(context);
-                    _addMember(user, selectedRole);
+                    _sendInvitation(user, selectedRole);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF1B4332),
                   ),
-                  child: const Text('إضافة'),
+                  child: const Text('ارسال دعوة'),
                 ),
               ],
             );
