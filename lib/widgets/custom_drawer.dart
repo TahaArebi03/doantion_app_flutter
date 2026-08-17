@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import '../screens/profile/my_invitations_screen.dart';
-import '../screens/profile/my_requests_screen.dart';
 
 class CustomDrawer extends StatelessWidget {
   final String organizationName;

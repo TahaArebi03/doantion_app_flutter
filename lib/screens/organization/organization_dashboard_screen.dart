@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../services/organization_service.dart';
 import '../../services/project_service.dart';
 import '../../services/member_service.dart';
+import '../../services/join_request_service.dart';
+import '../../services/invitation_service.dart';
 import '../../models/organization_model.dart';
 import '../../models/project_model.dart';
 import '../../models/member_model.dart';
@@ -32,7 +34,8 @@ class _OrganizationDashboardScreenState
   late OrganizationService _orgService;
   late ProjectService _projectService;
   late MemberService _memberService;
-
+  late JoinRequestService _joinRequestService;
+  late InvitationService _invitationService;
   // Data
   Organization? _organization;
   List<JoinRequest> _pendingRequests = [];
@@ -62,6 +65,8 @@ class _OrganizationDashboardScreenState
     _orgService = OrganizationService(widget.orgToken);
     _projectService = ProjectService(token: widget.orgToken);
     _memberService = MemberService(widget.orgToken);
+    _joinRequestService = JoinRequestService(widget.orgToken);
+    _invitationService = InvitationService(widget.orgToken);
     _fetchDashboardData();
     _fetchPendingRequests();
   }
@@ -124,24 +129,21 @@ class _OrganizationDashboardScreenState
   }
 
   Future<void> _fetchSentInvitations() async {
-    if (_organization == null) return;
     setState(() => _isLoadingInvitations = true);
     try {
-      _sentInvitations = await _memberService.getSentInvitations(
-        organizationId: _organization!.id,
-      );
+      _sentInvitations = await _invitationService.getSentInvitations();
     } catch (e) {
-      _showSnackBar('فشل جلب الدعوات المرسلة', Colors.red);
+      _showSnackBar('فشل جلب الدعوات: ${e.toString()}', Colors.red);
     } finally {
-      if (mounted) setState(() => _isLoadingInvitations = false);
+      setState(() => _isLoadingInvitations = false);
     }
   }
 
   Future<void> _fetchPendingRequests() async {
     setState(() => _isLoadingRequests = true);
     try {
-      _pendingRequests = await _memberService
-          .getPendingRequestsForOrganization();
+      _pendingRequests = await _joinRequestService
+          .getPendingRequestsForOrganization(_organization!.id);
     } catch (e) {
       _showSnackBar('فشل جلب الطلبات', Colors.red);
     } finally {
@@ -168,11 +170,10 @@ class _OrganizationDashboardScreenState
   // ==================== Member Actions ====================
   Future<void> _sendInvitation(UserModel user, String role) async {
     try {
-      setState(() => _isAdding = true);
-      await _memberService.inviteMember(
+      await _invitationService.sendInvitation(
         user.id,
         role,
-        organizationId: _organization?.id,
+        organizationId: _organization!.id,
       );
       _showSnackBar('تم إرسال الدعوة بنجاح', Colors.green);
       _availableUsers.removeWhere((u) => u.id == user.id);
@@ -583,7 +584,7 @@ class _OrganizationDashboardScreenState
                   icon: const Icon(Icons.check_circle, color: Colors.green),
                   onPressed: () async {
                     try {
-                      await _memberService.approveRequest(request.id);
+                      await _joinRequestService.approveRequest(request.id);
                       _showSnackBar('تم قبول الطلب', Colors.green);
                       await _fetchPendingRequests(); // تحديث القائمة
                       await _fetchMembers(); // تحديث قائمة الأعضاء
@@ -596,7 +597,7 @@ class _OrganizationDashboardScreenState
                   icon: const Icon(Icons.cancel, color: Colors.red),
                   onPressed: () async {
                     try {
-                      await _memberService.rejectRequest(request.id);
+                      await _joinRequestService.rejectRequest(request.id);
                       _showSnackBar('تم رفض الطلب', Colors.orange);
                       await _fetchPendingRequests();
                     } catch (e) {
@@ -724,7 +725,7 @@ class _OrganizationDashboardScreenState
                                   if (confirm == true) {
                                     setState(() => _isRemoving = true);
                                     try {
-                                      await _memberService.removeInvitation(
+                                      await _invitationService.cancelInvitation(
                                         invitation.id,
                                       );
                                       _showSnackBar(

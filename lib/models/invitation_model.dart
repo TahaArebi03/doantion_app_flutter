@@ -23,7 +23,7 @@ class Invitation {
 
   factory Invitation.fromJson(Map<String, dynamic> json) {
     final org = json['organization'] ?? json;
-    final inviteeData = json['user'] ?? json['invitee'];
+    final inviteeData = json['user'] ?? json;
     final String inviteeName = inviteeData is Map
         ? (inviteeData['name'] ?? inviteeData['full_name'] ?? '')
         : '';

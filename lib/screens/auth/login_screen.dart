@@ -66,7 +66,8 @@ class _LoginScreenState extends State<LoginScreen> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => OrganizationDashboardScreen(orgToken: token),
+              builder: (context) =>
+                  OrganizationDashboardScreen(orgToken: token),
             ),
           );
         } else {

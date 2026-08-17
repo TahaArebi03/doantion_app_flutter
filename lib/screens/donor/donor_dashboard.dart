@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../projects/projects_screen.dart';
 import '../organizations/organizations_screen.dart';
 import '../follows/my_follows_screen.dart';
-// import '../organization/my_organizations_screen.dart';
+import '../../widgets/notification_badge.dart';
 import '../donations/my_donations_screen.dart';
 import '../../themes/app_theme.dart';
 
@@ -29,6 +29,17 @@ class _DonorDashboardState extends State<DonorDashboard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        actions: [
+          NotificationBadge(
+            token: widget.userToken,
+            onNotificationTap: () {
+              // تحديث أي بيانات تحتاج تحديث عند تفاعل المستخدم مع الإشعارات
+              setState(() {});
+            },
+          ),
+        ],
+      ),
       body: _screens[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
@@ -40,7 +51,7 @@ class _DonorDashboardState extends State<DonorDashboard> {
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.volunteer_activism),
-            label: 'فرص التبرع',
+            label: 'الرئيسية',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.people_outline),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/organization_model.dart';
 import '../../services/member_service.dart';
 import '../../themes/app_theme.dart';
+import '../../services/join_request_service.dart';
 
 class OrganizationDetailScreen extends StatefulWidget {
   final Organization organization;
@@ -14,7 +15,8 @@ class OrganizationDetailScreen extends StatefulWidget {
 
 class _OrganizationDetailScreenState extends State<OrganizationDetailScreen> {
   late Organization? _organization;
-  late MemberService _memberService;
+
+  late JoinRequestService _joinRequestService;
   String? _requestStatus; // pending, approved, rejected, null
   bool _isLoadingRequest = false;
 
@@ -22,7 +24,7 @@ class _OrganizationDetailScreenState extends State<OrganizationDetailScreen> {
   void initState() {
     super.initState();
     _organization = widget.organization;
-    _memberService = MemberService('your_token_here');
+    _joinRequestService = JoinRequestService('your_token_here');
     _fetchOrganizationDetails();
     _fetchRequestStatus();
   }
@@ -43,13 +45,18 @@ class _OrganizationDetailScreenState extends State<OrganizationDetailScreen> {
 
   Future<void> _fetchRequestStatus() async {
     if (_organization == null) return;
+    setState(() => _isLoadingRequest = true);
     try {
-      final status = await _memberService.getUserRequestStatus(
+      final status = await _joinRequestService.getRequestStatus(
         _organization!.id,
       );
       setState(() => _requestStatus = status);
     } catch (e) {
-      _requestStatus = null;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('خطأ في جلب حالة الطلب: $e')));
+    } finally {
+      setState(() => _isLoadingRequest = false);
     }
   }
 
@@ -170,7 +177,7 @@ class _OrganizationDetailScreenState extends State<OrganizationDetailScreen> {
       onPressed: () async {
         setState(() => _isLoadingRequest = true);
         try {
-          await _memberService.submitJoinRequest(_organization!.id);
+          await _joinRequestService.sendRequest(_organization!.id);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('تم تقديم طلبك بنجاح'),
