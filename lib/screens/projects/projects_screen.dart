@@ -72,8 +72,26 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
     try {
       await _donationService.donateToProject(project.id, amount);
+
+      setState(() {
+        _projects = _projects.map((item) {
+          if (item.id != project.id) return item;
+          return ProjectModel(
+            id: item.id,
+            title: item.title,
+            description: item.description,
+            goal_amount: item.goal_amount,
+            balance: item.balance + amount,
+            status: item.status,
+            images: item.images,
+          );
+        }).toList();
+
+        _walletBalance = (_walletBalance - amount).clamp(0.0, double.infinity);
+      });
+
       _showSnackBar('تم التبرع بنجاح!', Colors.green);
-      await _fetchData(); // تحديث القائمة والرصيد
+      await _fetchData();
       await _refreshWallet();
     } catch (e) {
       _showSnackBar('فشل التبرع: $e', Colors.red);

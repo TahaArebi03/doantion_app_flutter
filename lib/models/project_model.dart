@@ -17,26 +17,63 @@ class ProjectModel {
     required this.images,
   });
 
+  static int _parseInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString()) ?? 0;
+  }
+
+  static double _parseAmount(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString()) ?? 0.0;
+  }
+
+  static Map<String, dynamic> _normalizeJson(Map<String, dynamic> json) {
+    final nestedProject = json['project'];
+    if (nestedProject is Map<String, dynamic>) {
+      return nestedProject;
+    }
+    if (nestedProject is Map) {
+      return Map<String, dynamic>.from(nestedProject);
+    }
+    return json;
+  }
+
   // دالة تحويل الـ JSON القادم من Laravel إلى كائن دارت يسهل قراءته
   factory ProjectModel.fromJson(Map<String, dynamic> json) {
+    final source = _normalizeJson(json);
+
     // معالجة الصور إن وجدت من المصفوفة المتداخلة
     List<String> imagesList = [];
-    if (json['images'] != null) {
-      imagesList = List<String>.from(
-        json['images'].map(
-          (img) => img is Map ? (img['image_path'] ?? '') : img.toString(),
-        ),
-      );
+    final imagesSource = source['images'] ?? json['images'];
+    if (imagesSource != null) {
+      if (imagesSource is List) {
+        imagesList = imagesSource.map((img) {
+          if (img is Map) return img['image_path'] ?? img['path'] ?? '';
+          return img.toString();
+        }).toList().cast<String>();
+      }
     }
 
+    final balanceValue =
+        source['balance'] ??
+        source['current_amount'] ??
+        source['amount_raised'] ??
+        source['total_raised'] ??
+        source['current_balance'] ??
+        source['donated_amount'] ??
+        source['raised_amount'] ??
+        0;
+
     return ProjectModel(
-      id: json['id'] ?? 0,
-      title: json['title'] ?? '',
-      description: json['description'] ?? '',
-      // السيرفر قد يرسل الأرقام بنوع int أو double، نقوم بتحويلها بأمان
-      goal_amount: double.tryParse(json['goal_amount'].toString()) ?? 0.0,
-      balance: double.tryParse(json['balance'].toString()) ?? 0.0,
-      status: json['status'] ?? 'active',
+      id: _parseInt(source['id'] ?? json['id']),
+      title: source['title'] ?? json['title'] ?? '',
+      description: source['description'] ?? json['description'] ?? '',
+      goal_amount: _parseAmount(source['goal_amount'] ?? json['goal_amount']),
+      balance: _parseAmount(balanceValue),
+      status: source['status'] ?? json['status'] ?? 'active',
       images: imagesList,
     );
   }

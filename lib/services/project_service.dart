@@ -29,8 +29,20 @@ class ProjectService {
       headers: _headers(),
     );
     if (response.statusCode == 200) {
-      List<dynamic> body = jsonDecode(response.body);
-      return body.map((item) => ProjectModel.fromJson(item)).toList();
+      final decoded = jsonDecode(response.body);
+      final body = decoded is Map
+          ? (decoded['projects'] ?? decoded['data'] ?? decoded['items'] ?? [])
+          : decoded;
+      if (body is! List) {
+        throw Exception('استجابة المشاريع غير صحيحة من الخادم');
+      }
+      return body
+          .map(
+            (item) => ProjectModel.fromJson(
+              item is Map ? Map<String, dynamic>.from(item) : {},
+            ),
+          )
+          .toList();
     } else {
       throw Exception('فشل في جلب كل المشاريع');
     }
@@ -43,8 +55,20 @@ class ProjectService {
       headers: _headers(),
     );
     if (response.statusCode == 200) {
-      List<dynamic> body = jsonDecode(response.body);
-      return body.map((item) => ProjectModel.fromJson(item)).toList();
+      final decoded = jsonDecode(response.body);
+      final body = decoded is Map
+          ? (decoded['projects'] ?? decoded['data'] ?? [])
+          : decoded;
+      if (body is! List) {
+        throw Exception('استجابة مشاريع الجمعية غير صحيحة من الخادم');
+      }
+      return body
+          .map(
+            (item) => ProjectModel.fromJson(
+              item is Map ? Map<String, dynamic>.from(item) : {},
+            ),
+          )
+          .toList();
     } else {
       throw Exception('فشل في جلب مشاريع هذه الجمعية');
     }
@@ -58,7 +82,12 @@ class ProjectService {
     );
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return ProjectModel.fromJson(data['project']);
+      final projectData = data is Map
+          ? (data['project'] ?? data['data'] ?? data)
+          : data;
+      return ProjectModel.fromJson(
+        projectData is Map ? Map<String, dynamic>.from(projectData) : {},
+      );
     } else {
       throw Exception('فشل في جلب تفاصيل المشروع');
     }
