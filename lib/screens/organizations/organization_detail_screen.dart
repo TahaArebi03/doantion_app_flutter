@@ -6,7 +6,13 @@ import '../../services/join_request_service.dart';
 
 class OrganizationDetailScreen extends StatefulWidget {
   final Organization organization;
-  const OrganizationDetailScreen({super.key, required this.organization});
+  final String? token;
+
+  const OrganizationDetailScreen({
+    super.key,
+    required this.organization,
+    this.token,
+  });
 
   @override
   State<OrganizationDetailScreen> createState() =>
@@ -24,7 +30,7 @@ class _OrganizationDetailScreenState extends State<OrganizationDetailScreen> {
   void initState() {
     super.initState();
     _organization = widget.organization;
-    _joinRequestService = JoinRequestService('your_token_here');
+    _joinRequestService = JoinRequestService(widget.token ?? '');
     _fetchOrganizationDetails();
     _fetchRequestStatus();
   }

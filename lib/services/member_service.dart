@@ -100,4 +100,17 @@ class MemberService {
       throw Exception('فشل حذف العضو');
     }
   }
+
+  // مغادرة جمعية (للمستخدم العادي)
+  Future<void> leaveOrganization(int organizationId) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/api/member/leave-organization'),
+      headers: _headers,
+      body: jsonEncode({'organization_id': organizationId}),
+    );
+    if (response.statusCode != 200) {
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'فشل مغادرة الجمعية');
+    }
+  }
 }

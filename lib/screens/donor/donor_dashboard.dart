@@ -5,6 +5,7 @@ import '../follows/my_follows_screen.dart';
 import '../../widgets/notification_badge.dart';
 import '../donations/my_donations_screen.dart';
 import '../../themes/app_theme.dart';
+import '../organizations/my_organizations_screen.dart';
 
 class DonorDashboard extends StatefulWidget {
   final String userToken;
@@ -18,13 +19,19 @@ class DonorDashboard extends StatefulWidget {
 class _DonorDashboardState extends State<DonorDashboard> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const ProjectsScreen(),
-    const OrganizationsScreen(),
-    const MyFollowsScreen(),
-    // const MyOrganizationsScreen(),
-    const MyDonationsScreen(),
-  ];
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      ProjectsScreen(token: widget.userToken),
+      OrganizationsScreen(token: widget.userToken),
+      MyFollowsScreen(token: widget.userToken),
+      MyOrganizationsScreen(token: widget.userToken), // جمعياتي
+      MyDonationsScreen(token: widget.userToken),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +47,7 @@ class _DonorDashboardState extends State<DonorDashboard> {
           ),
         ],
       ),
+
       body: _screens[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
