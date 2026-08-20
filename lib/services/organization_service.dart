@@ -75,33 +75,47 @@ class OrganizationService {
     );
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      final List<dynamic> orgs = data['organizations'] ?? [];
-      return orgs.map((o) => Organization.fromJson(o)).toList();
+      final List<dynamic> orgs = data is List
+          ? data
+          : (data['organizations'] ??
+                data['followed_organizations'] ??
+                data['data'] ??
+                []);
+      return orgs
+          .map(
+            (o) => Organization.fromJson({
+              ...o as Map<String, dynamic>,
+              'is_followed': true,
+            }),
+          )
+          .toList();
     }
-    throw Exception('فشل جلب المفضلة');
+    throw Exception(
+      'فشل جلب المفضلة (${response.statusCode}): ${response.body}',
+    );
   }
 
   // متابعة جمعية
   Future<void> followOrganization(int organizationId) async {
     final response = await http.post(
-      Uri.parse('$_baseUrl/api/organizations/follow'),
+      Uri.parse('$_baseUrl/api/organizations/$organizationId/follow'),
       headers: _headers,
-      body: jsonEncode({'organization_id': organizationId}),
+      // لا حاجة لـ Body هنا
     );
-    if (response.statusCode != 200) {
-      throw Exception('فشل متابعة الجمعية');
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('فشل متابعة الجمعية (${response.statusCode})');
     }
   }
 
   // إلغاء متابعة جمعية
   Future<void> unfollowOrganization(int organizationId) async {
     final response = await http.post(
-      Uri.parse('$_baseUrl/api/organizations/unfollow'),
+      Uri.parse('$_baseUrl/api/organizations/$organizationId/unfollow'),
       headers: _headers,
-      body: jsonEncode({'organization_id': organizationId}),
+      // لا حاجة لـ Body هنا
     );
-    if (response.statusCode != 200) {
-      throw Exception('فشل إلغاء متابعة الجمعية');
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('فشل إلغاء متابعة الجمعية (${response.statusCode})');
     }
   }
 }

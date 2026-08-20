@@ -16,6 +16,8 @@ class OrganizationsScreen extends StatefulWidget {
 
 class _OrganizationsScreenState extends State<OrganizationsScreen> {
   List<Organization> _organizations = [];
+  final Set<int> _followedOrganizationIds = <int>{};
+  final Set<int> _unfollowedOrganizationIds = <int>{};
   bool _isLoading = true;
 
   late OrganizationService _orgService;
@@ -31,10 +33,17 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
   }
 
   Future<void> _fetchData() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
 
     try {
       _organizations = await _orgService.getAllOrganizations();
+      for (final organization in _organizations) {
+        if (organization.isFollowed &&
+            !_unfollowedOrganizationIds.contains(organization.id)) {
+          _followedOrganizationIds.add(organization.id);
+        }
+      }
     } catch (e) {
       if (mounted) {
         _showSnackBar('فشل تحميل البيانات: $e', Colors.red);
@@ -56,7 +65,12 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('شركاء الخير')),
+      appBar: AppBar(
+        title: const Text('شركاء الخير'),
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _fetchData),
+        ],
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _organizations.isEmpty
@@ -66,8 +80,12 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
               itemCount: _organizations.length,
               itemBuilder: (context, index) {
                 final org = _organizations[index];
+                final isFollowed =
+                    !(_unfollowedOrganizationIds.contains(org.id)) &&
+                    (org.isFollowed ||
+                        _followedOrganizationIds.contains(org.id));
                 return OrganizationCard(
-                  organization: org,
+                  organization: org.copyWith(isFollowed: isFollowed),
                   onTap: () {
                     Navigator.push(
                       context,
@@ -77,18 +95,31 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                           token: widget.token,
                         ),
                       ),
-                    );
+                    ).then((_) => _fetchData());
                   },
                   onFollowToggle: () async {
                     try {
-                      if (org.isFollowed) {
+                      if (isFollowed) {
                         await _orgService.unfollowOrganization(org.id);
+                        if (mounted) {
+                          setState(() {
+                            _followedOrganizationIds.remove(org.id);
+                            _unfollowedOrganizationIds.add(org.id);
+                          });
+                        }
                       } else {
                         await _orgService.followOrganization(org.id);
+                        if (mounted) {
+                          setState(() {
+                            _followedOrganizationIds.add(org.id);
+                            _unfollowedOrganizationIds.remove(org.id);
+                          });
+                        }
                       }
                       await _fetchData();
                     } catch (e) {
-                      _showSnackBar('فشل: $e', Colors.red);
+                      if (!mounted) return;
+                      _showSnackBar('فشل تغيير المتابعة: $e', Colors.red);
                     }
                   },
                   onJoinRequest: () async {
@@ -104,7 +135,8 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                       _showSnackBar('تم تقديم الطلب', Colors.green);
                       await _fetchData();
                     } catch (e) {
-                      _showSnackBar('فشل: $e', Colors.red);
+                      if (!mounted) return;
+                      _showSnackBar('فشل تقديم الطلب: $e', Colors.red);
                     }
                   },
                 );

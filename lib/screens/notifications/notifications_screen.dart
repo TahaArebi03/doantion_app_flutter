@@ -36,25 +36,44 @@ class _NotificationsScreenState extends State<NotificationsScreen>
 
   Future<void> _fetchAll() async {
     setState(() => _isLoading = true);
+
+    // جلب الطلبات
     try {
       final r = await _requestsService.getMyRequests();
-      final i = await _invitationsService.getMyInvitations();
-      if (mounted)
-        setState(() {
-          _requests = r;
-          _invitations = i;
-        });
+      if (mounted) {
+        setState(() => _requests = r);
+      }
     } catch (e) {
-      if (mounted)
+      print('❌ Error fetching requests: $e');
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('فشل جلب الإشعارات: $e'),
-            backgroundColor: Colors.red,
+            content: Text('فشل جلب الطلبات: ${e.toString()}'),
+            backgroundColor: Colors.orange,
           ),
         );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      }
     }
+
+    // جلب الدعوات
+    try {
+      final i = await _invitationsService.getMyInvitations();
+      if (mounted) {
+        setState(() => _invitations = i);
+      }
+    } catch (e) {
+      print('❌ Error fetching invitations: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('فشل جلب الدعوات: ${e.toString()}'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
+
+    if (mounted) setState(() => _isLoading = false);
   }
 
   @override
@@ -68,6 +87,9 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('الإشعارات'),
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _fetchAll),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -102,11 +124,69 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                 style: const TextStyle(color: Colors.white),
               ),
             ),
-            title: Text('طلب انضمام إلى جمعية #${request.organizationId}'),
+            //  اسم الجمعية
+            title: Text('طلب انضمام إلى ${request.organizationName}'),
             subtitle: Text('التاريخ: ${request.createdAt.toLocal()}'),
-            trailing: Chip(
-              label: Text(_getArabicStatus(request.status)),
-              backgroundColor: _getStatusColor(request.status).withOpacity(0.2),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Chip(
+                  label: Text(_getArabicStatus(request.status)),
+                  backgroundColor: _getStatusColor(
+                    request.status,
+                  ).withOpacity(0.2),
+                ),
+                if (request.status == 'pending') ...[
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.cancel, color: Colors.red),
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('تأكيد الإلغاء'),
+                          content: const Text(
+                            'هل أنت متأكد من إلغاء هذا الطلب؟',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('إلغاء'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.redAccent,
+                              ),
+                              child: const Text('تأكيد الإلغاء'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        try {
+                          await _requestsService.cancelRequest(request.id);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('تم إلغاء الطلب'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                          await _fetchAll();
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('فشل إلغاء الطلب: ${e.toString()}'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    tooltip: 'إلغاء الطلب',
+                  ),
+                ],
+              ],
             ),
           ),
         );
@@ -174,7 +254,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
           ),
         );
       }
-      await _fetchAll();
+      await _fetchAll(); // تحديث القوائم
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('فشل: $e'), backgroundColor: Colors.red),

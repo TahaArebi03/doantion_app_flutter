@@ -21,12 +21,31 @@ class InvitationService {
       Uri.parse('$_baseUrl/api/invitations/myInvitations'),
       headers: _headers,
     );
+
+    print('📥 Invitations response status: ${response.statusCode}');
+    print('📥 Invitations response body: ${response.body}');
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
+      // تحقق من وجود المفتاح 'invitations'
       final List<dynamic> invitations = data['invitations'] ?? [];
+      if (invitations.isEmpty) {
+        print('⚠️ No invitations found in response');
+      }
       return invitations.map((i) => Invitation.fromJson(i)).toList();
+    } else {
+      // محاولة قراءة رسالة الخطأ
+      String errorMessage = 'فشل جلب الدعوات';
+      try {
+        final errorData = jsonDecode(response.body);
+        errorMessage =
+            errorData['error'] ?? errorData['message'] ?? errorMessage;
+      } catch (_) {
+        // إذا كان الجسم غير JSON
+        errorMessage = response.body;
+      }
+      throw Exception(errorMessage);
     }
-    throw Exception('فشل جلب الدعوات');
   }
 
   // قبول دعوة

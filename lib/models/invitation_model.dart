@@ -6,7 +6,7 @@ class Invitation {
   final String inviteeName;
   final String inviteeEmail;
   final String? inviteeImage;
-  final String status; // pending, accepted, rejected
+  final String status;
   final DateTime createdAt;
 
   Invitation({
@@ -22,29 +22,65 @@ class Invitation {
   });
 
   factory Invitation.fromJson(Map<String, dynamic> json) {
+    // محاولة استخراج بيانات المنظمة
     final org = json['organization'] ?? json;
+
+    // محاولة استخراج بيانات المستخدم المدعو
     final inviteeData = json['user'] ?? json;
-    final String inviteeName = inviteeData is Map
-        ? (inviteeData['name'] ?? inviteeData['full_name'] ?? '')
-        : '';
-    final String inviteeEmail = inviteeData is Map
-        ? (inviteeData['email'] ?? '')
-        : '';
-    final String? inviteeImage = inviteeData is Map
-        ? (inviteeData['image'] ??
-              inviteeData['avatar'] ??
-              inviteeData['profile_image'])
-        : null;
+
+    // استخراج الاسم - يدعم عدة تنسيقات
+    String inviteeName = '';
+    if (inviteeData is Map) {
+      inviteeName =
+          inviteeData['firstName'] ??
+          inviteeData['name'] ??
+          inviteeData['full_name'] ??
+          inviteeData['fullName'] ??
+          '';
+      // إذا كان هناك firstName و lastName
+      if (inviteeName.isEmpty &&
+          inviteeData['firstName'] != null &&
+          inviteeData['lastName'] != null) {
+        inviteeName = '${inviteeData['firstName']} ${inviteeData['lastName']}'
+            .trim();
+      }
+    }
+
+    // استخراج البريد الإلكتروني
+    String inviteeEmail = '';
+    if (inviteeData is Map) {
+      inviteeEmail = inviteeData['email'] ?? '';
+    }
+
+    // استخراج الصورة
+    String? inviteeImage;
+    if (inviteeData is Map) {
+      inviteeImage =
+          inviteeData['image'] ??
+          inviteeData['avatar'] ??
+          inviteeData['profile_image'];
+    }
+
+    // تحويل التاريخ بشكل آمن
+    DateTime createdAt = DateTime.now();
+    if (json['created_at'] != null) {
+      try {
+        createdAt = DateTime.parse(json['created_at']);
+      } catch (_) {
+        // تجاهل
+      }
+    }
+
     return Invitation(
       id: json['id'] ?? 0,
       organizationId: org['id'] ?? 0,
       organizationName: org['name'] ?? 'جمعية غير معروفة',
-      organizationImage: org['image'],
+      organizationImage: org['image'] ?? org['logo'],
       inviteeName: inviteeName,
       inviteeEmail: inviteeEmail,
       inviteeImage: inviteeImage,
       status: json['status'] ?? 'pending',
-      createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
+      createdAt: createdAt,
     );
   }
 }

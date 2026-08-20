@@ -7,12 +7,13 @@ class Organization {
   final bool isMember;
   final String? volunteerStatus; // none, pending, approved, rejected
   final int? membersCount;
+  final int? followersCount;
   final int? projectsCount;
   final int? ownerId;
   final String? ownerName;
   final String? ownerEmail;
-  final String? type; 
-  final String? status; 
+  final String? type;
+  final String? status;
 
   Organization({
     required this.id,
@@ -23,14 +24,34 @@ class Organization {
     this.isMember = false,
     this.volunteerStatus,
     this.membersCount,
+    this.followersCount,
     this.projectsCount,
     this.ownerId,
     this.ownerName,
     this.ownerEmail,
     this.type,
     this.status,
-
   });
+
+  Organization copyWith({bool? isFollowed}) {
+    return Organization(
+      id: id,
+      name: name,
+      description: description,
+      image: image,
+      isFollowed: isFollowed ?? this.isFollowed,
+      isMember: isMember,
+      volunteerStatus: volunteerStatus,
+      membersCount: membersCount,
+      followersCount: followersCount,
+      projectsCount: projectsCount,
+      ownerId: ownerId,
+      ownerName: ownerName,
+      ownerEmail: ownerEmail,
+      type: type,
+      status: status,
+    );
+  }
 
   factory Organization.fromJson(Map<String, dynamic> json) {
     return Organization(
@@ -41,7 +62,8 @@ class Organization {
       isFollowed: json['is_followed'] ?? false,
       isMember: json['is_member'] ?? false,
       volunteerStatus: json['volunteer_status'] ?? 'none',
-      membersCount: json['members_count'] ?? json['followersCount'] ?? 0,
+      membersCount: json['members_count'] ?? 0,
+      followersCount: json['followers_count'] ?? 0,
       projectsCount: json['projects_count'] ?? 0,
       ownerId: json['owner_id'] ?? json['user_id'] ?? null,
       ownerName: json['owner_name'] ?? json['user_name'] ?? null,
@@ -66,6 +88,7 @@ class Organization {
       'owner_id': ownerId,
       'owner_name': ownerName,
       'owner_email': ownerEmail,
+      'followers_count': followersCount,
     };
   }
 }

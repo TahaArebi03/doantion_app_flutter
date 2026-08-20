@@ -21,10 +21,28 @@ class JoinRequestService {
       Uri.parse('$_baseUrl/api/join-requests/myRequests'),
       headers: _headers,
     );
+
+    print('Response status: ${response.statusCode}');
+    print('Response body: ${response.body}');
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final List<dynamic> requests = data['requests'] ?? [];
-      return requests.map((r) => JoinRequest.fromJson(r)).toList();
+
+      // تحويل آمن مع تجاهل العناصر التي فشل تحويلها
+      return requests
+          .map((r) {
+            try {
+              return JoinRequest.fromJson(r);
+            } catch (e) {
+              print('❌ Failed to parse request: $e');
+              print('Data: $r');
+              return null;
+            }
+          })
+          .where((r) => r != null)
+          .cast<JoinRequest>()
+          .toList();
     }
     throw Exception('فشل جلب طلباتي');
   }
@@ -36,8 +54,23 @@ class JoinRequestService {
       headers: _headers,
       body: jsonEncode({'organization_id': organizationId}),
     );
-    if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception('فشل تقديم الطلب');
+
+    // قراءة الرد
+    final responseBody = response.body;
+    dynamic data;
+    try {
+      data = jsonDecode(responseBody);
+    } catch (_) {
+      throw Exception('استجابة غير صالحة من الخادم: $responseBody');
+    }
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return; // نجاح
+    } else {
+      // استخراج رسالة الخطأ
+      final errorMessage =
+          data['error'] ?? data['message'] ?? 'فشل تقديم الطلب';
+      throw Exception(errorMessage);
     }
   }
 
@@ -99,12 +132,31 @@ class JoinRequestService {
     }
   }
 
+  Future<void> cancelRequest(int requestId) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/api/join-requests/cancelRequest'),
+      headers: _headers,
+      body: jsonEncode({'request_id': requestId}),
+    );
+
+    if (response.statusCode == 200) {
+      return;
+    } else {
+      // قراءة رسالة الخطأ من السيرفر
+      String errorMessage = 'فشل إلغاء الطلب';
+      try {
+        final errorData = jsonDecode(response.body);
+        errorMessage =
+            errorData['error'] ?? errorData['message'] ?? errorMessage;
+      } catch (_) {}
+      throw Exception(errorMessage);
+    }
+  }
+
   // حالة الطلب لجمعية معينة
   Future<String?> getRequestStatus(int organizationId) async {
     final response = await http.get(
-      Uri.parse(
-        '$_baseUrl/api/join-requests/getRequestStatus?organization_id=$organizationId',
-      ),
+      Uri.parse('$_baseUrl/api/join-requests/getRequestStatus/$organizationId'),
       headers: _headers,
     );
     if (response.statusCode == 200) {
